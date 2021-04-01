@@ -2,6 +2,11 @@ import * as THREE from 'three';
 import { GUI } from 'three/examples/jsm/libs/dat.gui.module';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRenderer';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+// import { AdaptiveToneMappingPass } from 'three/examples/jsm/postprocessing/AdaptiveToneMappingPass.js';
+// import { GammaCorrectionShader } from 'three/examples/jsm/shaders/GammaCorrectionShader.js';
 import drawVert from './shaders/draw.vert';
 import drawFrag from './shaders/draw.frag';
 import updatePosition from './shaders/updatePosition.frag';
@@ -18,25 +23,46 @@ let canvas,
   positionVariable,
   velocityVariable,
   acceralationVariable,
-  particleUniforms,
   particleCnt,
   divide,
-  drawMaterial;
+  drawMaterial,
+  composer,
+  clock,
+  bloomPass;
+// adaptToneMappingPass,
+// hdrToneMappingPass;
 
-particleUniforms = {
+const particleUniforms = {
   positionBuffer: { value: null },
   velocityBuffer: { value: null },
   acceralationBuffer: { value: null },
   pSize: { value: 3.0 },
 };
 
+const params = {
+  p: 10.0,
+  r: 28.0,
+  b: 2.66,
+  pSize: 1.5,
+};
+
+const effectParams = {
+  exposure: 1,
+  Strength: 1.0,
+  Threshold: 0.5,
+  Radius: 1.0,
+};
+
 function init() {
   canvas = document.querySelector('#c');
   renderer = new THREE.WebGLRenderer({ canvas });
+  // renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  // renderer.toneMappingExposure = 1.0;
   document.body.appendChild(renderer.domElement);
   scene = new THREE.Scene();
   particleCnt = 300000;
   divide = 100;
+  clock = new THREE.Clock();
 }
 
 function initGPUComputationRenderer() {
@@ -184,12 +210,25 @@ function addObject() {
   scene.add(points);
 }
 
-const params = {
-  p: 10.0,
-  r: 28.0,
-  b: 2.66,
-  pSize: 1.5,
-};
+function addEffect() {
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  //composer.setSize(canvas.clientWidth, canvas.clientHeight);
+
+  bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    1,
+    1,
+    1
+  );
+  bloomPass.threshold = effectParams.Threshold;
+  bloomPass.strength = effectParams.Strength;
+  bloomPass.radius = effectParams.Radius;
+  bloomPass.renderToScreen = true;
+  composer.addPass(bloomPass);
+
+  scene.fog = new THREE.Fog(0x000000, 0, 20);
+}
 
 function addGUI() {
   gui = new GUI();
@@ -216,6 +255,7 @@ function update() {
     const canvas = renderer.domElement;
     camera.aspect = canvas.clientWidth / canvas.clientHeight;
     camera.updateProjectionMatrix();
+    composer.setSize(canvas.width, canvas.height);
   }
 
   gpuCompute.compute();
@@ -230,7 +270,8 @@ function update() {
     acceralationVariable
   ).texture;
 
-  renderer.render(scene, camera);
+  // renderer.render(scene, camera);
+  composer.render(clock.getDelta());
 }
 
 function resizeRendererToDisplaySize(renderer) {
@@ -245,16 +286,12 @@ function resizeRendererToDisplaySize(renderer) {
   return needResize;
 }
 
-function restart() {
-  initGPUComputationRenderer();
-  addObject();
-}
-
 (function () {
   init();
   initGPUComputationRenderer();
   addCamera();
   addObject();
+  addEffect();
   addGUI();
   update();
 })();
