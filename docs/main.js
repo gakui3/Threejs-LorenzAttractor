@@ -12,11 +12,13 @@ import drawFrag from './shaders/draw.frag';
 import updatePosition from './shaders/updatePosition.frag';
 import updateVelocity from './shaders/updateVelocity.frag';
 import updateAcceralation from './shaders/updateAcceralation.frag';
+// import { container } from 'webpack';
 
 let canvas,
   renderer,
   scene,
   camera,
+  controls,
   geometry,
   gui,
   gpuCompute,
@@ -164,9 +166,10 @@ function addCamera() {
   camera.position.set(0, 0, -50);
   camera.aspect = canvas.clientWidth / canvas.clientHeight;
 
-  const controls = new OrbitControls(camera, canvas);
+  controls = new OrbitControls(camera, canvas);
   controls.target.set(0, 0, 50);
-  controls.update();
+  controls.autoRotate = true;
+  // controls.update();
 }
 
 function addObject() {
@@ -258,6 +261,7 @@ function update() {
     composer.setSize(canvas.width, canvas.height);
   }
 
+  controls.update();
   gpuCompute.compute();
 
   particleUniforms.positionBuffer.value = gpuCompute.getCurrentRenderTarget(
